@@ -246,6 +246,101 @@ def admin_page():
 def logout():
     session.clear()
     return redirect('/')
+    
+@app.route('/api/admin/get_structure')
+def get_structure():
+    try:
+        students = db.reference('Students').get()
+
+        structure = {}
+
+        if not students:
+            return jsonify({})
+
+        for dept, batches in students.items():
+            structure[dept] = {}
+            for batch, sections in batches.items():
+                structure[dept][batch] = {}
+                for sec in sections.keys():
+                    structure[dept][batch][sec] = True
+
+        return jsonify(structure)
+
+    except Exception:
+        traceback.print_exc()
+        return jsonify({}), 500
+
+
+@app.route('/api/admin/get_report')
+def get_report():
+    try:
+        dept = request.args.get('dept')
+        batch = request.args.get('batch')
+        sec = request.args.get('sec')
+        date = request.args.get('date')
+
+        path = f"Attendance/{dept}/{batch}/{sec}/{date}"
+        data = db.reference(path).get()
+
+        if not data:
+            return jsonify([])
+
+        result = []
+
+        for roll, info in data.items():
+            result.append({
+                "roll": roll,
+                "name": info.get("name", ""),
+                "attendance": {k: v for k, v in info.items() if k.startswith("P")}
+            })
+
+        return jsonify(result)
+
+    except Exception:
+        traceback.print_exc()
+        return jsonify([]), 500
+
+
+@app.route('/api/admin/get_student_cumulative_stats')
+def get_student_cumulative_stats():
+    try:
+        roll = request.args.get('roll')
+
+        attendance = db.reference('Attendance').get()
+
+        subject_stats = {}
+
+        if not attendance:
+            return jsonify({})
+
+        for dept in attendance.values():
+            for batch in dept.values():
+                for sec in batch.values():
+                    for date in sec.values():
+                        if roll in date:
+                            student = date[roll]
+
+                            for key, val in student.items():
+                                if key.startswith("P") and isinstance(val, dict):
+                                    subject = val.get("subject", "Unknown")
+                                    status = val.get("status")
+
+                                    if subject not in subject_stats:
+                                        subject_stats[subject] = {
+                                            "attended": 0,
+                                            "total": 0
+                                        }
+
+                                    subject_stats[subject]["total"] += 1
+
+                                    if status in ["P", "OD"]:
+                                        subject_stats[subject]["attended"] += 1
+
+        return jsonify(subject_stats)
+
+    except Exception:
+        traceback.print_exc()
+        return jsonify({}), 500
 
 
 if __name__ == '__main__':
