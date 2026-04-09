@@ -1,4 +1,5 @@
 flask
 firebase-admin
+pytz
 pandas
 openpyxl
