@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Portal | Rapid Attendance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .input-focus { @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all; }
+    </style>
+</head>
+<body class="bg-[#f8fafc] min-h-screen text-slate-900">
+
+    <div id="loginOverlay" class="fixed inset-0 z-[100] bg-slate-900 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-blue-200">
+                    <span class="text-white font-black text-2xl">A</span>
+                </div>
+                <h2 class="text-2xl font-extrabold text-slate-800">Faculty Login</h2>
+                <p class="text-slate-500 text-sm">NBA Attendance Archive System</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="userEmail" placeholder="Email Address" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl input-focus">
+                <input type="password" id="userPass" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl input-focus">
+                <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-100 active:scale-[0.98]">
+                    SIGN IN
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainApp" class="hidden">
+        <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+            <div class="container mx-auto px-4 h-20 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">A</div>
+                    <div>
+                        <h1 class="font-bold text-slate-800 leading-none">Attendance Archive</h1>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Faculty Module 2.0</span>
+                    </div>
+                </div>
+                <button onclick="location.reload()" class="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors">LOGOUT</button>
+            </div>
+        </nav>
+
+        <div class="container mx-auto px-4 py-8">
+            <div class="glass-card p-8 rounded-[2rem] border border-slate-200 shadow-sm mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 mb-2 uppercase ml-1">Date</label>
+                        <input type="date" id="attDate" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 input-focus">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 mb-2 uppercase ml-1">Dept</label>
+                        <select id="dept" onchange="loadBatches()" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 input-focus cursor-pointer">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 mb-2 uppercase ml-1">Batch</label>
+                        <select id="batch" onchange="loadSections()" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 input-focus cursor-pointer">
+                            <option value="">--</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 mb-2 uppercase ml-1">Section</label>
+                        <select id="section" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 input-focus cursor-pointer">
+                            <option value="">--</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="fetchClassData()" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl transition-all shadow-xl active:scale-95">
+                            LOAD LIST
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="workspace" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div class="glass-card rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-6 bg-slate-50/50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-extrabold text-slate-800" id="classLabel">---</h2>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-tight" id="dayLabel">Syncing Schedule...</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="bulkMarkAll('P')" class="bg-emerald-50 text-emerald-600 text-[10px] font-extrabold px-5 py-3 rounded-xl hover:bg-emerald-100 transition-all uppercase tracking-wider">Mark All Present</button>
+                            <button onclick="bulkMarkAll('A')" class="bg-rose-50 text-rose-600 text-[10px] font-extrabold px-5 py-3 rounded-xl hover:bg-rose-100 transition-all uppercase tracking-wider">Mark All Absent</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-[10px] text-slate-400 uppercase font-bold tracking-widest border-b border-slate-100">
+                                    <th class="px-8 py-5">Student Info</th>
+                                    <th class="px-4 py-5">Daily Action</th>
+                                    <th class="px-2 py-5 text-center">P1</th><th class="px-2 py-5 text-center">P2</th>
+                                    <th class="px-2 py-5 text-center">P3</th><th class="px-2 py-5 text-center">P4</th>
+                                    <th class="px-2 py-5 text-center">P5</th><th class="px-2 py-5 text-center">P6</th>
+                                    <th class="px-2 py-5 text-center">P7</th><th class="px-2 py-5 text-center">P8</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentList" class="divide-y divide-slate-50"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-10 bg-slate-50/50 border-t border-slate-200 flex flex-col items-center">
+                        <p class="text-[10px] font-bold text-slate-400 mb-4 uppercase">Confirm all entries before saving</p>
+                        <button onclick="submitToNBA()" id="submitBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-16 py-5 rounded-[2rem] shadow-2xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95">
+                            SAVE TO RECORDS
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let fullDbStructure = {};
+        let studentData = [];
+        let dailyTimetable = {};
+
+        // Authentication Logic
+        function handleLogin() {
+            const email = document.getElementById('userEmail').value;
+            const pass = document.getElementById('userPass').value;
+
+            if(email === "admin@exam" && pass === "password") {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                initApp();
+            } else {
+                alert("Invalid Faculty Credentials");
+            }
+        }
+
+        async function initApp() {
+            try {
+                const snap = await db.ref('Students').once('value');
+                fullDbStructure = snap.val() || {};
+                const deptSelect = document.getElementById('dept');
+                deptSelect.innerHTML = '<option value="">Select Dept</option>';
+                Object.keys(fullDbStructure).forEach(dept => {
+                    deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        function loadBatches() {
+            const dept = document.getElementById('dept').value;
+            const bSelect = document.getElementById('batch');
+            bSelect.innerHTML = '<option value="">Batch</option>';
+            if(dept && fullDbStructure[dept]) {
+                Object.keys(fullDbStructure[dept]).forEach(b => bSelect.innerHTML += `<option value="${b}">${b}</option>`);
+            }
+        }
+
+        function loadSections() {
+            const dept = document.getElementById('dept').value;
+            const batch = document.getElementById('batch').value;
+            const sSelect = document.getElementById('section');
+            sSelect.innerHTML = '<option value="">Sec</option>';
+            if(dept && batch && fullDbStructure[dept][batch]) {
+                Object.keys(fullDbStructure[dept][batch]).forEach(s => sSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            }
+        }
+
+        async function fetchClassData() {
+            const dateVal = document.getElementById('attDate').value;
+            const dept = document.getElementById('dept').value;
+            const batch = document.getElementById('batch').value;
+            const sec = document.getElementById('section').value;
+
+            if(!dateVal || !dept || !batch || !sec) return alert("Select all filters");
+
+            const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(dateVal).getDay()];
+            if(dayName === "Sunday") return alert("Sunday is a Holiday");
+
+            const ttYear = (batch === "2027") ? "Year III" : "Year II";
+            
+            try {
+                const ttSnap = await db.ref(`Timetable/${dept}/${batch}/${ttYear}/${sec}/${dayName}`).once('value');
+                dailyTimetable = ttSnap.val() || {};
+                document.getElementById('dayLabel').innerText = `Timetable Synced: ${dayName}`;
+
+                const stuVal = fullDbStructure[dept][batch][sec];
+                studentData = Object.keys(stuVal).map(k => ({ roll: k, ...stuVal[k] }));
+                renderWorkspace(dept, batch, sec);
+            } catch(e) { alert("Database Error"); }
+        }
+
+        function renderWorkspace(dept, batch, sec) {
+            document.getElementById('classLabel').innerText = `${dept} ${batch} - Section ${sec}`;
+            const container = document.getElementById('studentList');
+            container.innerHTML = "";
+
+            studentData.forEach(stu => {
+                let row = `<tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-8 py-5">
+                        <div class="font-bold text-slate-800 text-sm">${stu.roll}</div>
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">${stu.name}</div>
+                    </td>
+                    <td class="px-4 py-5">
+                        <select onchange="applyToStudent('${stu.roll}', this.value)" class="bg-white border border-slate-200 rounded-xl text-[10px] p-3 font-bold cursor-pointer text-blue-600">
+                            <option value="">Bulk Action</option>
+                            <option value="P">Set Present</option>
+                            <option value="A">Set Absent</option>
+                        </select>
+                    </td>
+                    ${[1,2,3,4,5,6,7,8].map(p => `
+                        <td class="px-1 py-5">
+                            <select data-roll="${stu.roll}" data-p="P${p}" class="att-input w-full border-none bg-slate-100/50 rounded-lg text-[10px] p-2 font-black text-center cursor-pointer appearance-none">
+                                <option value="P">P</option><option value="A" class="text-rose-600">A</option><option value="OD" class="text-blue-600">OD</option>
+                            </select>
+                        </td>
+                    `).join('')}
+                </tr>`;
+                container.innerHTML += row;
+            });
+            document.getElementById('workspace').classList.remove('hidden');
+        }
+
+        function applyToStudent(roll, val) {
+            if(!val) return;
+            document.querySelectorAll(`.att-input[data-roll="${roll}"]`).forEach(s => {
+                s.value = val;
+                s.parentElement.style.opacity = (val === 'A') ? "1" : "0.5";
+            });
+        }
+
+        function bulkMarkAll(val) {
+            document.querySelectorAll('.att-input').forEach(s => s.value = val);
+        }
+
+        async function submitToNBA() {
+            const date = document.getElementById('attDate').value;
+            const dept = document.getElementById('dept').value;
+            const batch = document.getElementById('batch').value;
+            const sec = document.getElementById('section').value;
+            const btn = document.getElementById('submitBtn');
+            
+            btn.disabled = true;
+            btn.innerText = "UPLOADING TO CLOUD...";
+
+            const finalPayload = {};
+            document.querySelectorAll('.att-input').forEach(input => {
+                const roll = input.dataset.roll;
+                const pNum = input.dataset.p;
+                const status = input.value;
+                const studentName = studentData.find(s => s.roll === roll).name;
+                const subjectName = dailyTimetable[pNum]?.subject || "N/A";
+
+                if(!finalPayload[roll]) finalPayload[roll] = { name: studentName };
+                finalPayload[roll][pNum] = { status: status, subject: subjectName };
+            });
+
+            try {
+                await db.ref(`Attendance/${dept}/${batch}/${sec}/${date}`).set(finalPayload);
+                alert("Records Archived Successfully!");
+            } catch(e) { alert("Archival Failed!"); }
+            finally { btn.disabled = false; btn.innerText = "SAVE TO RECORDS"; }
+        }
+    </script>
+</body>
+</html>
