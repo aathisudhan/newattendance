@@ -1,0 +1,134 @@
+import firebase_admin
+from firebase_admin import credentials, db
+import os
+
+# 1. Setup Firebase
+if not firebase_admin._apps:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cred_path = os.path.join(script_dir, "serviceAccountKey.json")
+    
+    cred = credentials.Certificate(cred_path) 
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app'
+    })
+
+def load_faculty_mapping(filename='faculty_mapping.txt'):
+    """Loads mapping from the same folder as the script."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, filename)
+    
+    name_to_id = {}
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                if ',' in line:
+                    fid, name = line.strip().split(',', 1)
+                    # Clean for matching
+                    clean_name = name.strip().upper().replace(".", "").replace(" ", "")
+                    name_to_id[clean_name] = fid.strip()
+        return name_to_id
+    except Exception as e:
+        print(f"❌ Mapping Error: {e}")
+        return {}
+
+def get_fid(name_str, mapping):
+    """Fuzzy matching helper"""
+    query = name_str.strip().upper().replace(".", "").replace(" ", "")
+    return mapping.get(query, "None")
+
+def update_section_g():
+    f_map = load_faculty_mapping('faculty_mapping.txt')
+    
+    # Timings: Start -30 mins | End -10 mins
+    times = {
+        "P1": "07:30-08:40", "P2": "08:20-09:30", "P3": "09:10-10:20",
+        "P4": "10:15-11:30", "P5": "11:10-12:30", "P6": "12:45-01:45",
+        "P7": "01:25-02:25", "P8": "02:05-03:05"
+    }
+
+    # Faculty Mapping based on Section G Staff List
+    staff = {
+        "DL": get_fid("MR. K. VIJAYAKUMAR", f_map),
+        "CV": get_fid("MRS. B. BALA ABIRAMI", f_map),
+        "BA": get_fid("DR. M. S. MAHARAJAN", f_map),
+        "CTT": get_fid("DR. C. GNANAPRAKASAM", f_map),
+        "SE": get_fid("MRS. K. SARANYA", f_map),
+        "DIP": get_fid("MR. M. VENKATESAN", f_map),
+        "LIB": get_fid("MRS. V. PRIYA", f_map),
+        "DIP_LAB": get_fid("MR. M. VENKATESAN", f_map),
+        "DL_LAB": get_fid("MRS. K. MALVIKA", f_map),
+        "CV_LAB": get_fid("MRS. B. BALA ABIRAMI", f_map),
+        "TSP": get_fid("DR. C. BHARANIDHARAN", f_map)
+    }
+
+    timetable_data = {
+        "Monday": {
+            "P1": {"subject": "CTT", "faculty": staff["CTT"], "time": times["P1"]},
+            "P2": {"subject": "SE", "faculty": staff["SE"], "time": times["P2"]},
+            "P3": {"subject": "DL", "faculty": staff["DL"], "time": times["P3"]},
+            "P4": {"subject": "DL", "faculty": staff["DL"], "time": times["P4"]},
+            "P5": {"subject": "CV", "faculty": staff["CV"], "time": times["P5"]},
+            "P6": {"subject": "SE", "faculty": staff["SE"], "time": times["P6"]},
+            "P7": {"subject": "DIP", "faculty": staff["DIP"], "time": times["P7"]},
+            "P8": {"subject": "DIP", "faculty": staff["DIP"], "time": times["P8"]},
+        },
+        "Tuesday": {
+            "P1": {"subject": "CV/DL LAB", "faculty": staff["CV_LAB"], "time": times["P1"]},
+            "P2": {"subject": "CV/DL LAB", "faculty": staff["DL_LAB"], "time": times["P2"]},
+            "P3": {"subject": "CV/DL LAB", "faculty": staff["CV_LAB"], "time": times["P3"]},
+            "P4": {"subject": "DL", "faculty": staff["DL"], "time": times["P4"]},
+            "P5": {"subject": "SE", "faculty": staff["SE"], "time": times["P5"]},
+            "P6": {"subject": "LIB", "faculty": staff["LIB"], "time": times["P6"]},
+            "P7": {"subject": "DIP", "faculty": staff["DIP"], "time": times["P7"]},
+            "P8": {"subject": "CTT", "faculty": staff["CTT"], "time": times["P8"]},
+        },
+        "Wednesday": {
+            "P1": {"subject": "DL", "faculty": staff["DL"], "time": times["P1"]},
+            "P2": {"subject": "CV", "faculty": staff["CV"], "time": times["P2"]},
+            "P3": {"subject": "DL", "faculty": staff["DL"], "time": times["P3"]},
+            "P4": {"subject": "BA", "faculty": staff["BA"], "time": times["P4"]},
+            "P5": {"subject": "CTT", "faculty": staff["CTT"], "time": times["P5"]},
+            "P6": {"subject": "CV", "faculty": staff["CV"], "time": times["P6"]},
+            "P7": {"subject": "BA", "faculty": staff["BA"], "time": times["P7"]},
+            "P8": {"subject": "CTT", "faculty": staff["CTT"], "time": times["P8"]},
+        },
+        "Thursday": {
+            "P1": {"subject": "DIP", "faculty": staff["DIP"], "time": times["P1"]},
+            "P2": {"subject": "CV", "faculty": staff["CV"], "time": times["P2"]},
+            "P3": {"subject": "BA", "faculty": staff["BA"], "time": times["P3"]},
+            "P4": {"subject": "DIP LAB", "faculty": staff["DIP_LAB"], "time": times["P4"]},
+            "P5": {"subject": "DIP LAB", "faculty": staff["DIP_LAB"], "time": times["P5"]},
+            "P6": {"subject": "BA", "faculty": staff["BA"], "time": times["P6"]},
+            "P7": {"subject": "SE", "faculty": staff["SE"], "time": times["P7"]},
+            "P8": {"subject": "CTT", "faculty": staff["CTT"], "time": times["P8"]},
+        },
+        "Friday": {
+            "P1": {"subject": "SE", "faculty": staff["SE"], "time": times["P1"]},
+            "P2": {"subject": "DIP", "faculty": staff["DIP"], "time": times["P2"]},
+            "P3": {"subject": "BA", "faculty": staff["BA"], "time": times["P3"]},
+            "P4": {"subject": "TSP LAB", "faculty": staff["TSP"], "time": times["P4"]},
+            "P5": {"subject": "TSP LAB", "faculty": staff["TSP"], "time": times["P5"]},
+            "P6": {"subject": "CV/DL LAB", "faculty": staff["CV_LAB"], "time": times["P6"]},
+            "P7": {"subject": "CV/DL LAB", "faculty": staff["DL_LAB"], "time": times["P7"]},
+            "P8": {"subject": "CV/DL LAB", "faculty": staff["CV_LAB"], "time": times["P8"]},
+        }
+    }
+
+    # Database reference for Section G
+    db.reference("Timetable/AI&DS/2027/Year III/G").set(timetable_data)
+    
+    print("\n✅ Section G Timetable Uploaded Successfully.")
+    print("┌" + "─"*62 + "┐")
+    print(f"│{'SECTION G UPLOAD (-30m Start | -10m End)':^62}│")
+    print("├──────────┬────────┬─────────────┬───────────┬──────────────┤")
+    print(f"│ {'DAY':^8} │ {'PER':^6} │ {'WINDOW':^11} │ {'SUB':^9} │ {'FACULTY ID':^12} │")
+    print("├──────────┼────────┼─────────────┼───────────┼──────────────┤")
+    
+    for day, periods in timetable_data.items():
+        for p_id, info in periods.items():
+            f_id = str(info['faculty'])
+            print(f"│ {day:^8} │ {p_id:^6} │ {info['time']:^11} │ {info['subject']:^9} │ {f_id:^12} │")
+    print("└──────────┴────────┴─────────────┴───────────┴──────────────┘")
+
+if __name__ == "__main__":
+    update_section_g()

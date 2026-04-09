@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Records | Smart Attendance Entry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20 font-sans">
+
+    <nav class="bg-indigo-900 text-white p-4 shadow-xl mb-6">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-widest uppercase">Attendance Archive System</h1>
+            <span class="text-xs bg-indigo-700 px-3 py-1 rounded-full border border-indigo-400">NBA Compliance Module</span>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 mb-1 tracking-tighter uppercase">Entry Date</label>
+                    <input type="date" id="attDate" class="w-full border-2 border-slate-100 rounded-xl p-3 focus:border-indigo-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 mb-1 tracking-tighter uppercase">Department</label>
+                    <select id="dept" class="w-full border-2 border-slate-100 rounded-xl p-3 outline-none"><option value="AI&DS">AI&DS</option></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 mb-1 tracking-tighter uppercase">Batch Year</label>
+                    <select id="batch" class="w-full border-2 border-slate-100 rounded-xl p-3 outline-none">
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 mb-1 tracking-tighter uppercase">Section</label>
+                    <select id="section" class="w-full border-2 border-slate-100 rounded-xl p-3 outline-none">
+                        <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                        <option value="D">D</option><option value="E">E</option><option value="F">F</option>
+                        <option value="G">G</option><option value="H">H</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="fetchClassData()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95">
+                        LOAD RECORDS
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace" class="hidden animate-in fade-in duration-500">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-5 bg-slate-50 border-b flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-slate-800 font-bold" id="classLabel">---</h2>
+                        <p class="text-xs text-slate-500" id="dayLabel">Checking Timetable...</p>
+                    </div>
+                    <button onclick="bulkMark('P')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black px-6 py-2 rounded-lg uppercase tracking-widest">
+                        Mark All Present
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="text-[10px] text-slate-400 uppercase tracking-tighter bg-slate-50/50">
+                                <th class="px-6 py-4 border-b">Roll Number</th>
+                                <th class="px-6 py-4 border-b">Student Name</th>
+                                <th id="th-P1" class="px-2 py-4 border-b text-center">P1</th>
+                                <th id="th-P2" class="px-2 py-4 border-b text-center">P2</th>
+                                <th id="th-P3" class="px-2 py-4 border-b text-center">P3</th>
+                                <th id="th-P4" class="px-2 py-4 border-b text-center">P4</th>
+                                <th id="th-P5" class="px-2 py-4 border-b text-center">P5</th>
+                                <th id="th-P6" class="px-2 py-4 border-b text-center">P6</th>
+                                <th id="th-P7" class="px-2 py-4 border-b text-center">P7</th>
+                                <th id="th-P8" class="px-2 py-4 border-b text-center">P8</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentList" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+
+                <div class="p-8 bg-slate-50 border-t flex justify-center">
+                    <button onclick="submitToNBA()" id="submitBtn" class="bg-indigo-600 hover:bg-indigo-800 text-white font-black px-20 py-4 rounded-2xl shadow-xl shadow-indigo-100 transition-all hover:-translate-y-1">
+                        SAVE ATTENDANCE TO FIREBASE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let studentData = [];
+        let dailyTimetable = {};
+
+        async function fetchClassData() {
+            const dateVal = document.getElementById('attDate').value;
+            const dept = document.getElementById('dept').value;
+            const batch = document.getElementById('batch').value;
+            const sec = document.getElementById('section').value;
+
+            if(!dateVal) return alert("Please select a date first!");
+
+            const dateObj = new Date(dateVal);
+            const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const dayName = days[dateObj.getDay()];
+            
+            if(dayName === "Sunday") return alert("Attendance cannot be marked for Sunday!");
+
+            // 1. Fetch Timetable for the specific Day
+            const ttYear = (batch === "2027") ? "Year III" : "Year II";
+            const ttRef = db.ref(`Timetable/${dept}/${batch}/${ttYear}/${sec}/${dayName}`);
+            
+            try {
+                const ttSnap = await ttRef.once('value');
+                dailyTimetable = ttSnap.val() || {};
+                document.getElementById('dayLabel').innerText = `Schedule for ${dayName} Loaded`;
+                
+                // Update Headers with Subject Names
+                for(let i=1; i<=8; i++) {
+                    const sub = dailyTimetable[`P${i}`]?.subject || "---";
+                    document.getElementById(`th-P${i}`).innerHTML = `<div class="text-[9px] text-indigo-500">${sub}</div>P${i}`;
+                }
+
+                // 2. Fetch Students
+                const stuSnap = await db.ref(`Students/${dept}/${batch}/${sec}`).once('value');
+                const stuVal = stuSnap.val();
+                if(!stuVal) return alert("No students found in this section!");
+
+                studentData = Object.keys(stuVal).map(k => ({ roll: k, ...stuVal[k] }));
+                renderWorkspace(dept, batch, sec);
+            } catch(e) { console.error(e); alert("Firebase Connection Error"); }
+        }
+
+        function renderWorkspace(dept, batch, sec) {
+            document.getElementById('classLabel').innerText = `${dept} ${batch} - Section ${sec}`;
+            const container = document.getElementById('studentList');
+            container.innerHTML = "";
+
+            studentData.forEach(stu => {
+                let row = `<tr class="hover:bg-indigo-50/50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-slate-700">${stu.roll}</td>
+                    <td class="px-6 py-4 text-slate-600 font-medium uppercase text-xs">${stu.name}</td>
+                    ${[1,2,3,4,5,6,7,8].map(p => `
+                        <td class="px-1 py-4">
+                            <select data-roll="${stu.roll}" data-p="P${p}" class="att-input w-full border-none bg-slate-100 rounded-lg text-[10px] p-2 font-black cursor-pointer focus:ring-2 focus:ring-indigo-400">
+                                <option value="P">P</option>
+                                <option value="A" class="text-red-500">A</option>
+                                <option value="OD" class="text-blue-500">OD</option>
+                            </select>
+                        </td>
+                    `).join('')}
+                </tr>`;
+                container.innerHTML += row;
+            });
+            document.getElementById('workspace').classList.remove('hidden');
+        }
+
+        function bulkMark(val) {
+            document.querySelectorAll('.att-input').forEach(s => s.value = val);
+        }
+
+        async function submitToNBA() {
+            const date = document.getElementById('attDate').value;
+            const dept = document.getElementById('dept').value;
+            const batch = document.getElementById('batch').value;
+            const sec = document.getElementById('section').value;
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = "WRITING RECORDS...";
+
+            const finalPayload = {};
+            const inputs = document.querySelectorAll('.att-input');
+
+            inputs.forEach(input => {
+                const roll = input.dataset.roll;
+                const pNum = input.dataset.p;
+                const status = input.value;
+                const studentName = studentData.find(s => s.roll === roll).name;
+                const subjectName = dailyTimetable[pNum]?.subject || "NO_SUBJECT";
+
+                if(!finalPayload[roll]) {
+                    finalPayload[roll] = { name: studentName };
+                }
+
+                finalPayload[roll][pNum] = {
+                    status: status,
+                    subject: subjectName
+                };
+            });
+
+            try {
+                await db.ref(`Attendance/${dept}/${batch}/${sec}/${date}`).set(finalPayload);
+                alert("SUCCESS: Records stored in requested NBA format.");
+            } catch(e) {
+                alert("Upload Failed!");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "SAVE ATTENDANCE TO FIREBASE";
+            }
+        }
+    </script>
+</body>
+</html>

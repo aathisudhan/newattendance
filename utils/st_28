@@ -1,0 +1,77 @@
+import firebase_admin
+from firebase_admin import credentials, db
+import pandas as pd
+import os
+
+# 1. Setup Firebase
+if not firebase_admin._apps:
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Locate serviceAccountKey.json in the same folder as the script
+    cred_path = os.path.join(script_dir, "serviceAccountKey.json")
+    
+    if not os.path.exists(cred_path):
+        print(f"❌ Error: serviceAccountKey.json not found at {cred_path}")
+    else:
+        cred = credentials.Certificate(cred_path) 
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app'
+        })
+
+def upload_students_2028(file_path):
+    try:
+        # Load the Excel file
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        print(f"❌ Error reading Excel: {e}")
+        return
+
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.upper()
+    
+    required_cols = ['SEC', 'ROLL NO', 'REGISTER NUMBER', 'NAME']
+    if not all(col in df.columns for col in required_cols):
+        print(f"❌ Missing columns! Found: {list(df.columns)}")
+        print(f"Expected: {required_cols}")
+        return
+
+    # TARGET PATH UPDATED FOR 2028
+    root_ref = db.reference("Students/AI&DS/2028")
+    
+    print(f"🚀 Starting upload for Batch 2028...")
+
+    success_count = 0
+    for index, row in df.iterrows():
+        # Data Cleaning
+        section = str(row['SEC']).strip().upper()
+        # '2024PEC AI 001' -> '2024PECAI001'
+        roll_no = str(row['ROLL NO']).replace(" ", "").strip().upper()
+        
+        student_data = {
+            "name": str(row['NAME']).strip().upper(),
+            "regno": str(row['REGISTER NUMBER']).strip()
+        }
+
+        # Hierarchy: Students -> AI&DS -> 2028 -> {Section} -> {RollNo}
+        try:
+            root_ref.child(section).child(roll_no).set(student_data)
+            print(f"✅ [{section}] Uploaded: {roll_no}")
+            success_count += 1
+        except Exception as e:
+            print(f"⚠️ Failed to upload {roll_no}: {e}")
+
+    print(f"\n✨ 2028 Batch Sync Complete. Total uploaded: {success_count}")
+
+if __name__ == "__main__":
+    # Locate the file inside the same folder as the script
+    current_folder = os.path.dirname(os.path.abspath(__file__))
+    
+    # Update this filename if your 2028 data file has a different name
+    excel_file_path = os.path.join(current_folder, "st_28_data.xlsx")
+    
+    if os.path.exists(excel_file_path):
+        upload_students_2028(excel_file_path)
+    else:
+        print(f"❌ File not found: {excel_file_path}")
+        print(f"📂 Folder contents: {os.listdir(current_folder)}")

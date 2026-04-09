@@ -1,0 +1,78 @@
+import firebase_admin
+from firebase_admin import credentials, db
+import pandas as pd
+import os
+
+# 1. Setup Firebase
+if not firebase_admin._apps:
+    # Get the directory where this script (st_27.py) is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Locate serviceAccountKey.json in the same folder as the script
+    cred_path = os.path.join(script_dir, "serviceAccountKey.json")
+    
+    if not os.path.exists(cred_path):
+        print(f"❌ Error: serviceAccountKey.json not found at {cred_path}")
+    else:
+        cred = credentials.Certificate(cred_path) 
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app'
+        })
+
+def upload_students_from_excel(file_path):
+    # Load Excel Data
+    try:
+        # Note: pip install openpyxl is required for .xlsx files
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        print(f"❌ Error reading Excel: {e}")
+        return
+
+    # Clean column names to handle any trailing spaces or case issues
+    df.columns = df.columns.str.strip().str.upper()
+    
+    # Required columns check based on your Excel sheet
+    required_cols = ['SEC', 'ROLL NO', 'REGISTER NUMBER', 'NAME']
+    if not all(col in df.columns for col in required_cols):
+        print(f"❌ Missing columns! Found: {list(df.columns)}")
+        print(f"Expected: {required_cols}")
+        return
+
+    root_ref = db.reference("Students/AI&DS/2027")
+    
+    print(f"🚀 Starting upload for Batch 2027...")
+
+    success_count = 0
+    for index, row in df.iterrows():
+        # Clean the data from current row
+        section = str(row['SEC']).strip().upper()
+        # Removes spaces from Roll No: '2023PEC AI 541' -> '2023PECAI541'
+        roll_no = str(row['ROLL NO']).replace(" ", "").strip().upper()
+        
+        student_data = {
+            "name": str(row['NAME']).strip().upper(),
+            "regno": str(row['REGISTER NUMBER']).strip()
+        }
+
+        # Path: Students/AI&DS/2027/{SEC}/{ROLL_NO}
+        try:
+            root_ref.child(section).child(roll_no).set(student_data)
+            print(f"✅ [{section}] Uploaded: {roll_no}")
+            success_count += 1
+        except Exception as e:
+            print(f"⚠️ Failed to upload {roll_no}: {e}")
+
+    print(f"\n✨ Synchronization complete. Total uploaded: {success_count}")
+
+if __name__ == "__main__":
+    # DYNAMIC PATH: This ensures it looks inside 'utils' even if terminal is in 'Root'
+    current_folder = os.path.dirname(os.path.abspath(__file__))
+    excel_file_path = os.path.join(current_folder, "st_27_data.xlsx")
+    
+    print(f"🔍 Searching for file at: {excel_file_path}")
+    
+    if os.path.exists(excel_file_path):
+        upload_students_from_excel(excel_file_path)
+    else:
+        print(f"❌ File not found: {excel_file_path}")
+        print(f"📂 Files visible in this folder: {os.listdir(current_folder)}")

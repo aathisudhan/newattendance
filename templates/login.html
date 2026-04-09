@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login | PEC Attendance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: linear-gradient(135deg, #EEF2FF 0%, #FDF2F8 100%); 
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+
+        .g-bg { position: fixed; width: 100vw; height: 100vh; top: 0; left: 0; z-index: -1; filter: blur(80px); opacity: 0.5; }
+        .blob { position: absolute; width: 40vw; height: 40vw; border-radius: 50%; animation: move 20s infinite alternate; }
+        .blue { background: #6366f1; top: -10%; left: -10%; }
+        .pink { background: #ec4899; bottom: -10%; right: -10%; animation-delay: -5s; }
+        @keyframes move { from { transform: translate(0, 0) scale(1); } to { transform: translate(10%, 10%) scale(1.1); } }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-btn.active {
+            background: #000;
+            color: #fff;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="g-bg">
+        <div class="blob blue"></div>
+        <div class="blob pink"></div>
+    </div>
+
+    <div class="w-full max-w-md px-6">
+        <div class="glass-card rounded-[2.5rem] p-10">
+            <div class="text-center mb-10">
+                <div class="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-pink-500 rounded-3xl mx-auto flex items-center justify-center text-white shadow-2xl mb-6">
+                    <span class="text-3xl font-black text-white">P</span>
+                </div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">PEC Portal</h1>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">Attendance Management System</p>
+            </div>
+
+            <form action="/login" method="POST" class="space-y-6">
+                <div class="flex p-1.5 bg-white/50 rounded-2xl border border-white gap-2">
+                    <button type="button" onclick="setRole('faculty')" id="faculty-btn" class="role-btn active flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">Faculty</button>
+                    <button type="button" onclick="setRole('admin')" id="admin-btn" class="role-btn flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">Admin</button>
+                    <input type="hidden" name="role" id="role-input" value="faculty">
+                </div>
+
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2 block">Username / ID</label>
+                        <input type="text" name="username" required
+                               placeholder="e.g. F001 or admin"
+                               class="w-full bg-white/80 border border-white px-6 py-4 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300">
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2 block">Password</label>
+                        <input type="password" name="password" required
+                               placeholder="••••••••"
+                               class="w-full bg-white/80 border border-white px-6 py-4 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300">
+                    </div>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-black hover:-translate-y-1 active:scale-95 transition-all">
+                    Secure Login
+                </button>
+            </form>
+
+            <div class="mt-8 text-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">© 2026 Panimalar Engineering College</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setRole(role) {
+            document.getElementById('role-input').value = role;
+            
+            // UI Toggle
+            const facultyBtn = document.getElementById('faculty-btn');
+            const adminBtn = document.getElementById('admin-btn');
+            
+            if (role === 'faculty') {
+                facultyBtn.classList.add('active');
+                adminBtn.classList.remove('active');
+            } else {
+                adminBtn.classList.add('active');
+                facultyBtn.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login | PEC Attendance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: linear-gradient(135deg, #EEF2FF 0%, #FDF2F8 100%); 
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .g-bg { position: fixed; width: 100vw; height: 100vh; top: 0; left: 0; z-index: -1; filter: blur(80px); opacity: 0.5; }
+        .blob { position: absolute; width: 40vw; height: 40vw; border-radius: 50%; animation: move 20s infinite alternate; }
+        .blue { background: #6366f1; top: -10%; left: -10%; }
+        .pink { background: #ec4899; bottom: -10%; right: -10%; animation-delay: -5s; }
+        @keyframes move { from { transform: translate(0, 0) scale(1); } to { transform: translate(10%, 10%) scale(1.1); } }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-btn {
+            color: #64748b;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .role-btn.active {
+            background: #000;
+            color: #fff;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="g-bg">
+        <div class="blob blue"></div>
+        <div class="blob pink"></div>
+    </div>
+
+    <div class="w-full max-w-md px-6">
+        <div class="glass-card rounded-[2.5rem] p-10">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-pink-500 rounded-3xl mx-auto flex items-center justify-center text-white shadow-2xl mb-6">
+                    <span class="text-3xl font-black text-white">P</span>
+                </div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">PEC Portal</h1>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">Attendance Management System</p>
+            </div>
+
+            <form action="/login" method="POST" class="space-y-6">
+                <div class="flex p-1.5 bg-white/50 rounded-2xl border border-white gap-1">
+                    <button type="button" onclick="setRole('student')" id="student-btn" class="role-btn active flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all">Student</button>
+                    <button type="button" onclick="setRole('faculty')" id="faculty-btn" class="role-btn flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all">Faculty</button>
+                    <button type="button" onclick="setRole('admin')" id="admin-btn" class="role-btn flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all">Admin</button>
+                    <input type="hidden" name="role" id="role-input" value="student">
+                </div>
+
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label id="user-label" class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2 block">Student Roll No / ID</label>
+                        <input type="text" id="username" name="username" required
+                               placeholder="Enter your ID"
+                               class="w-full bg-white/80 border border-white px-6 py-4 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300">
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2 block">Password</label>
+                        <input type="password" name="password" required
+                               placeholder="••••••••"
+                               class="w-full bg-white/80 border border-white px-6 py-4 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300">
+                    </div>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-black hover:-translate-y-1 active:scale-95 transition-all">
+                    Secure Login
+                </button>
+            </form>
+
+            <div class="mt-8 text-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">© 2026 Panimalar Engineering College</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setRole(role) {
+            // Update Hidden Input
+            document.getElementById('role-input').value = role;
+            
+            // UI Toggle for Buttons
+            const roles = ['student', 'faculty', 'admin'];
+            roles.forEach(r => {
+                const btn = document.getElementById(`${r}-btn`);
+                if (r === role) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Contextual Placeholder/Label Updates
+            const label = document.getElementById('user-label');
+            const input = document.getElementById('username');
+            
+            if (role === 'student') {
+                label.innerText = 'Student Roll No';
+                input.placeholder = 'e.g. 21142120xxxx';
+            } else if (role === 'faculty') {
+                label.innerText = 'Faculty ID';
+                input.placeholder = 'e.g. F001';
+            } else {
+                label.innerText = 'Admin Username';
+                input.placeholder = 'admin';
+            }
+        }
+    </script>
+</body>
+</html> -->

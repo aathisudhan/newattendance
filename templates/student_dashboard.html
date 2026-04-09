@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal | PEC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #F1F5F9; 
+            min-height: 100vh; 
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .stat-circle {
+            background: conic-gradient(#6366f1 var(--perc), #E2E8F0 0);
+        }
+
+        .scroll-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="pb-12">
+
+    <header class="px-6 py-8 max-w-7xl mx-auto flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">Welcome, Vetri Selvan M</h1>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">AI & Data Science • Year III</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-right hidden md:block">
+                <p class="text-[10px] font-black text-slate-400 uppercase">Roll Number</p>
+                <p class="text-sm font-bold text-slate-800">2023AIDS01</p>
+            </div>
+            <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">VS</div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <div class="lg:col-span-8 space-y-8">
+            
+            <div class="bg-white p-4 rounded-[2rem] shadow-sm flex items-center justify-between">
+                <button onclick="changeWeek(-1)" class="p-3 hover:bg-slate-50 rounded-2xl text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <h2 id="current-week-range" class="font-black text-slate-800 text-sm uppercase tracking-widest">April 06 - April 11, 2026</h2>
+                <button onclick="changeWeek(1)" class="p-3 hover:bg-slate-50 rounded-2xl text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
+            <div id="attendance-timeline" class="space-y-4">
+                </div>
+        </div>
+
+        <div class="lg:col-span-4 space-y-8">
+            <div class="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
+                <div class="relative z-10">
+                    <p class="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em] mb-2">Overall Attendance</p>
+                    <h3 id="overall-perc" class="text-5xl font-black mb-4">92%</h3>
+                    <div class="w-full bg-indigo-800/50 h-2 rounded-full mb-2">
+                        <div class="bg-indigo-400 h-full rounded-full" style="width: 92%"></div>
+                    </div>
+                    <p class="text-[10px] font-bold text-indigo-200">You have missed 4 sessions this month.</p>
+                </div>
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-800 rounded-full blur-3xl opacity-50"></div>
+            </div>
+
+            <div class="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
+                <h3 class="font-black text-slate-900 uppercase text-xs tracking-widest mb-6">Subject Statistics</h3>
+                <div id="subject-stats-list" class="space-y-6">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentStartDate = new Date(2026, 3, 6); // April 6, 2026
+
+        window.onload = () => {
+            renderTimeline();
+            renderSubjectStats();
+        };
+
+        function changeWeek(direction) {
+            currentStartDate.setDate(currentStartDate.getDate() + (direction * 7));
+            renderTimeline();
+        }
+
+        async function renderTimeline() {
+            const timeline = document.getElementById('attendance-timeline');
+            const rangeText = document.getElementById('current-week-range');
+            
+            // Update range text
+            const end = new Date(currentStartDate);
+            end.setDate(end.getDate() + 5);
+            rangeText.innerText = `${currentStartDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})} - ${end.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
+
+            timeline.innerHTML = '<div class="p-10 text-center animate-pulse text-slate-400 font-bold">Syncing Timetable...</div>';
+
+            // Simulate API Fetch for that week
+            setTimeout(() => {
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                timeline.innerHTML = days.map((day, idx) => {
+                    const date = new Date(currentStartDate);
+                    date.setDate(date.getDate() + idx);
+                    
+                    return `
+                    <div class="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-50 transition-all hover:border-indigo-100">
+                        <div class="flex flex-wrap md:flex-nowrap items-center gap-6">
+                            <div class="min-w-[100px]">
+                                <p class="text-[10px] font-black text-indigo-500 uppercase">${day}</p>
+                                <p class="text-xl font-black text-slate-800">${date.getDate()} ${date.toLocaleDateString('en-US', {month:'short'})}</p>
+                            </div>
+                            
+                            <div class="flex-1 flex gap-2 overflow-x-auto scroll-hide py-2">
+                                ${[1,2,3,4,5,6,7,8].map(p => `
+                                    <div class="flex-shrink-0 group relative">
+                                        <div class="w-10 h-10 rounded-xl border-2 ${Math.random() > 0.2 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-600'} flex items-center justify-center font-black text-[10px]">
+                                            P${p}
+                                        </div>
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-900 text-white text-[8px] py-1 px-2 rounded whitespace-nowrap z-20">
+                                            Data Structures
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="text-right">
+                                <p class="text-[9px] font-black text-slate-400 uppercase">Daily Stat</p>
+                                <p class="text-sm font-black text-slate-800">${Math.floor(Math.random() * 3) + 5}/8</p>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+            }, 500);
+        }
+
+        function renderSubjectStats() {
+            const stats = [
+                { name: 'Computer Vision', attended: 32, total: 34 },
+                { name: 'Deep Learning', attended: 28, total: 30 },
+                { name: 'Natural Language Processing', attended: 22, total: 30 },
+                { name: 'Cloud Computing', attended: 29, total: 30 }
+            ];
+
+            const list = document.getElementById('subject-stats-list');
+            list.innerHTML = stats.map(s => {
+                const perc = Math.round((s.attended / s.total) * 100);
+                const color = perc > 85 ? 'emerald' : perc > 75 ? 'indigo' : 'rose';
+                
+                return `
+                <div class="group">
+                    <div class="flex justify-between items-end mb-2">
+                        <p class="text-[11px] font-black text-slate-700 uppercase tracking-tight">${s.name}</p>
+                        <p class="text-xs font-black text-${color}-600">${perc}%</p>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div class="bg-${color}-500 h-full transition-all duration-1000" style="width: ${perc}%"></div>
+                    </div>
+                    <div class="flex justify-between mt-1">
+                         <p class="text-[8px] font-bold text-slate-400 uppercase">${s.attended}/${s.total} Hours</p>
+                         <p class="text-[8px] font-bold text-slate-400 uppercase">${s.total - s.attended} Absent</p>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
