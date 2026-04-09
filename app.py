@@ -23,28 +23,36 @@ def handle_exception(e):
 
 
 # --- FIREBASE SETUP ---
+# --- FIREBASE SETUP ---
 if not firebase_admin._apps:
     try:
         service_account_info = os.getenv('FIREBASE_SERVICE_ACCOUNT')
 
         if service_account_info:
+            # Clean potential hidden wrapping quotes from Vercel env vars
+            service_account_info = service_account_info.strip()
+            if service_account_info.startswith('"') and service_account_info.endswith('"'):
+                service_account_info = service_account_info[1:-1]
+            
             key_dict = json.loads(service_account_info)
 
             if "private_key" in key_dict:
+                # Fixes the JWT Signature error
                 key_dict["private_key"] = key_dict["private_key"].replace('\\n', '\n')
 
             cred = credentials.Certificate(key_dict)
         else:
+            # Local fallback
             cred = credentials.Certificate("serviceAccountKey.json")
 
         firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://newattendance-39e26-default-rtdb.asia-southeast1.firebasedatabase.app'
         })
-
-        print("✅ Firebase Connected")
+        print("✅ Firebase Connected Successfully")
 
     except Exception as e:
-        print("🔥 Firebase Error:", e)
+        print("🔥 CRITICAL: Firebase Initialization Failed!")
+        traceback.print_exc()
 
 
 # --- IST TIME ---
