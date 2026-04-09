@@ -194,21 +194,44 @@ def process_slots(day_data, dept, batch, sec, assigned_slots, current_time, curr
 
 # --- API ---
 
+# @app.route('/api/get_students')
+# def get_students():
+#     try:
+#         dept = request.args.get('dept')
+#         batch = request.args.get('batch')
+#         sec = request.args.get('sec')
+
+#         path = f"Students/{dept}/{batch}/{sec}"
+#         data = db.reference(path).get()
+
+#         return jsonify(data if data else {})
+
+#     except Exception:
+#         traceback.print_exc()
+#         return jsonify({"error": "Server error"}), 500
 @app.route('/api/get_students')
 def get_students():
-    try:
-        dept = request.args.get('dept')
-        batch = request.args.get('batch')
-        sec = request.args.get('sec')
+    dept = request.args.get('dept')
+    batch = request.args.get('batch')
+    sec = request.args.get('sec')
+    period = request.args.get('period') # New parameter
+    date = datetime.now().strftime('%Y-%m-%d') # Get current date
 
-        path = f"Students/{dept}/{batch}/{sec}"
-        data = db.reference(path).get()
+    # 1. Fetch all students in that class
+    all_students = Student.query.filter_by(dept=dept, batch=batch, sec=sec).all()
+    
+    # 2. Fetch existing attendance for today/this period
+    existing_records = Attendance.query.filter_by(date=date, period=period).all()
+    status_map = {r.roll: r.status for r in existing_records}
 
-        return jsonify(data if data else {})
-
-    except Exception:
-        traceback.print_exc()
-        return jsonify({"error": "Server error"}), 500
+    # 3. Combine the data
+    result = {}
+    for s in all_students:
+        result[s.roll] = {
+            "name": s.name,
+            "status": status_map.get(s.roll) # This will be None if not marked
+        }
+    return jsonify(result)
 
 
 @app.route('/api/submit_attendance', methods=['POST'])
