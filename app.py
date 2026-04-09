@@ -16,11 +16,18 @@ if not firebase_admin._apps:
     
     if service_account_info:
         try:
-            # Fix for Vercel: ensure the JSON string is clean
-            key_dict = json.loads(service_account_info.strip(), strict=False)
+            # 1. Load the raw JSON
+            key_dict = json.loads(service_account_info)
+            
+            # 2. CRITICAL FIX: Repair the private_key newlines
+            # Vercel often escapes backslashes, breaking the JWT signature
+            if "private_key" in key_dict:
+                key_dict["private_key"] = key_dict["private_key"].replace('\\n', '\n')
+            
             cred = credentials.Certificate(key_dict)
+            print("✅ Firebase Credentials Repaired & Loaded")
         except Exception as e:
-            print(f"🔥 Error parsing FIREBASE_SERVICE_ACCOUNT: {e}")
+            print(f"🔥 JSON Parsing Failed: {e}")
             cred = credentials.Certificate("serviceAccountKey.json")
     else:
         cred = credentials.Certificate("serviceAccountKey.json")
