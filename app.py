@@ -7,20 +7,21 @@ from datetime import datetime
 import pytz
 
 app = Flask(__name__)
-# Set a fallback secret key if environment variable is missing
+# Security: Use environment variable for secret key on Vercel
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "pec_attendance_system_2026")
 
-# --- FIREBASE SETUP ---
+# --- FIREBASE SECURE SETUP ---
 if not firebase_admin._apps:
-    # Check if running on Vercel (look for Environment Variable)
-    if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
+    service_account_info = os.getenv('FIREBASE_SERVICE_ACCOUNT')
+    
+    if service_account_info:
         try:
-            # Parse the JSON string stored in Vercel Environment Variables
-            service_account_info = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
-            cred = credentials.Certificate(service_account_info)
+            # Parse the JSON string from Vercel Environment Variables
+            key_dict = json.loads(service_account_info)
+            cred = credentials.Certificate(key_dict)
         except Exception as e:
-            print(f"🔥 Error parsing Environment Variable: {e}")
-            # Fallback to local file if parsing fails
+            print(f"🔥 Error parsing FIREBASE_SERVICE_ACCOUNT: {e}")
+            # Fallback to local file if env variable parsing fails
             cred = credentials.Certificate("serviceAccountKey.json")
     else:
         # Local development fallback
@@ -54,6 +55,7 @@ def login():
 
     if role == 'faculty':
         f_data = db.reference(f'Faculty/{uid}').get()
+        # Convert password to string to avoid type mismatch errors
         if f_data and str(f_data.get('password')) == str(pwd):
             session.update({
                 'user': uid, 
@@ -65,6 +67,8 @@ def login():
 
     return "Login Failed. Please check credentials."
 
+# --- FACULTY SECTION ---
+
 @app.route('/faculty')
 def faculty_page():
     if session.get('role') != 'faculty':
@@ -74,39 +78,46 @@ def faculty_page():
     timetable = db.reference('Timetable').get() or {}
     assigned_slots = []
     
-    # Logic: Crawl through Dept > Batch > Year Level > Section > Day
-    for dept, batches in timetable.items():
-        for batch, years in batches.items():
-            for year_label, sections in years.items():
-                for sec, days in sections.items():
-                    if day_str in days:
-                        for period, info in days[day_str].items():
-                            if info.get('faculty') == session['user']:
-                                try:
-                                    time_range = info.get('time').split('-')
-                                    start = datetime.strptime(time_range[0].strip(), "%H:%M").time()
-                                    end = datetime.strptime(time_range[1].strip(), "%H:%M").time()
-                                    
-                                    # Logic: Show card if current time is within slot
-                                    if start <= current_time <= end:
-                                        assigned_slots.append({
-                                            'dept': dept, 
-                                            'batch': batch, 
-                                            'sec': sec,
-                                            'period': period, 
-                                            'subject': info.get('subject'), 
-                                            'time': info.get('time')
-                                        })
-                                except:
-                                    pass
-    
+    # Robust Crawl: Handles Dept > Batch > Year > Section OR Dept > Batch > Section
+    try:
+        for dept, batches in timetable.items():
+            if not isinstance(batches, dict): continue
+            for batch, years in batches.items():
+                if not isinstance(years, dict): continue
+                for year_label, sections in years.items():
+                    if not isinstance(sections, dict): continue
+                    # If the level is already sections
+                    if day_str in sections:
+                        process_slots(sections[day_str], dept, batch, year_label, assigned_slots, current_time)
+                    else:
+                        # If there is another nested level for Section
+                        for sec, days in sections.items():
+                            if isinstance(days, dict) and day_str in days:
+                                process_slots(days[day_str], dept, batch, sec, assigned_slots, current_time)
+    except Exception as e:
+        print(f"Timetable Error: {e}")
+
     return render_template('faculty_mark.html', slots=assigned_slots)
+
+def process_slots(day_data, dept, batch, sec, assigned_slots, current_time):
+    for period, info in day_data.items():
+        if info.get('faculty') == session.get('user'):
+            try:
+                time_range = info.get('time', '').split('-')
+                if len(time_range) == 2:
+                    start = datetime.strptime(time_range[0].strip(), "%H:%M").time()
+                    end = datetime.strptime(time_range[1].strip(), "%H:%M").time()
+                    if start <= current_time <= end:
+                        assigned_slots.append({
+                            'dept': dept, 'batch': batch, 'sec': sec,
+                            'period': period, 'subject': info.get('subject'), 
+                            'time': info.get('time')
+                        })
+            except: pass
 
 @app.route('/api/get_students')
 def get_students():
-    dept = request.args.get('dept')
-    batch = request.args.get('batch')
-    sec = request.args.get('sec')
+    dept, batch, sec = request.args.get('dept'), request.args.get('batch'), request.args.get('sec')
     path = f"Students/{dept}/{batch}/{sec}"
     data = db.reference(path).get()
     return jsonify(data) if data else (jsonify({}), 404)
@@ -121,12 +132,11 @@ def submit_attendance():
     for roll, info in d['records'].items():
         ref.child(roll).update({
             "name": info['name'],
-            d['period']: {
-                "status": info['status'],
-                "subject": subject_name
-            }
+            d['period']: {"status": info['status'], "subject": subject_name}
         })
     return jsonify({"status": "success"})
+
+# --- ADMIN SECTION ---
 
 @app.route('/admin')
 def admin_page():
@@ -136,7 +146,9 @@ def admin_page():
 
 @app.route('/api/admin/get_structure')
 def get_structure():
-    return jsonify(db.reference('Students').get() or {})
+    # Crucial for dropdowns: Returns the full Students tree
+    data = db.reference('Students').get()
+    return jsonify(data if data else {})
 
 @app.route('/api/admin/get_report')
 def get_report():
@@ -149,24 +161,24 @@ def get_report():
         'name': info.get('name'),
         'attendance': attendance_data.get(roll, {}) 
     } for roll, info in students.items()]
-    
     return jsonify(report_data)
 
 @app.route('/api/admin/get_student_cumulative_stats')
 def get_student_cumulative_stats():
     target_roll = request.args.get('roll')
     if not target_roll: return jsonify({"error": "Roll required"}), 400
-
     try:
         all_data = db.reference('Attendance').get() or {}
         subject_map = {}
-
-        # Flattened crawl to find the specific student across all dates
+        # Deep flattened crawl
         for dept in all_data.values():
+            if not isinstance(dept, dict): continue
             for batch in dept.values():
+                if not isinstance(batch, dict): continue
                 for sec in batch.values():
+                    if not isinstance(sec, dict): continue
                     for date_data in sec.values():
-                        if target_roll in date_data:
+                        if isinstance(date_data, dict) and target_roll in date_data:
                             student_day = date_data[target_roll]
                             for i in range(1, 9):
                                 p_key = f'P{i}'
