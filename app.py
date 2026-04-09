@@ -16,15 +16,13 @@ if not firebase_admin._apps:
     
     if service_account_info:
         try:
-            # Parse the JSON string from Vercel Environment Variables
-            key_dict = json.loads(service_account_info)
+            # Fix for Vercel: ensure the JSON string is clean
+            key_dict = json.loads(service_account_info.strip(), strict=False)
             cred = credentials.Certificate(key_dict)
         except Exception as e:
             print(f"🔥 Error parsing FIREBASE_SERVICE_ACCOUNT: {e}")
-            # Fallback to local file if env variable parsing fails
             cred = credentials.Certificate("serviceAccountKey.json")
     else:
-        # Local development fallback
         cred = credentials.Certificate("serviceAccountKey.json")
 
     firebase_admin.initialize_app(cred, {
@@ -45,59 +43,26 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    uid = request.form.get('username')
-    pwd = request.form.get('password')
+    uid = request.form.get('username', '').strip()
+    pwd = request.form.get('password', '').strip()
     role = request.form.get('role')
 
     if role == 'admin' and uid == 'admin' and pwd == 'admin':
-        session.update({'user': 'Admin', 'role': 'admin'})
+        session.update({'user': 'Admin', 'role': 'admin', 'name': 'Administrator', 'dept': 'System'})
         return redirect(url_for('admin_page'))
 
     if role == 'faculty':
         f_data = db.reference(f'Faculty/{uid}').get()
-        # Convert password to string to avoid type mismatch errors
         if f_data and str(f_data.get('password')) == str(pwd):
             session.update({
                 'user': uid, 
                 'role': 'faculty', 
                 'name': f_data.get('name', 'Professor'),
-                'dept': f_data.get('dept')
+                'dept': f_data.get('dept', 'General')
             })
             return redirect(url_for('faculty_page'))
 
     return "Login Failed. Please check credentials."
-
-# --- FACULTY SECTION ---
-
-# @app.route('/faculty')
-# def faculty_page():
-#     if session.get('role') != 'faculty':
-#         return redirect(url_for('index'))
-    
-#     _, day_str, current_time = get_ist_info()
-#     timetable = db.reference('Timetable').get() or {}
-#     assigned_slots = []
-    
-#     # Robust Crawl: Handles Dept > Batch > Year > Section OR Dept > Batch > Section
-#     try:
-#         for dept, batches in timetable.items():
-#             if not isinstance(batches, dict): continue
-#             for batch, years in batches.items():
-#                 if not isinstance(years, dict): continue
-#                 for year_label, sections in years.items():
-#                     if not isinstance(sections, dict): continue
-#                     # If the level is already sections
-#                     if day_str in sections:
-#                         process_slots(sections[day_str], dept, batch, year_label, assigned_slots, current_time)
-#                     else:
-#                         # If there is another nested level for Section
-#                         for sec, days in sections.items():
-#                             if isinstance(days, dict) and day_str in days:
-#                                 process_slots(days[day_str], dept, batch, sec, assigned_slots, current_time)
-#     except Exception as e:
-#         print(f"Timetable Error: {e}")
-
-#     return render_template('faculty_mark.html', slots=assigned_slots)
 
 @app.route('/faculty')
 def faculty_page():
@@ -105,10 +70,11 @@ def faculty_page():
         return redirect(url_for('index'))
     
     _, day_str, current_time = get_ist_info()
-    # 1. Ensure timetable is always a dict
     timetable = db.reference('Timetable').get()
+    
+    # Pre-emptive safety check
     if not isinstance(timetable, dict):
-        timetable = {}
+        return render_template('faculty_mark.html', slots=[])
 
     assigned_slots = []
     
@@ -118,26 +84,26 @@ def faculty_page():
             for batch, years in batches.items():
                 if not isinstance(years, dict): continue
                 for year_label, sections in years.items():
-                    # FIX: Check if 'sections' is actually the Day (Monday/Tuesday) 
-                    # or if it's a Section level (A/B/C)
                     if not isinstance(sections, dict): continue
                     
+                    # Logic: Check if current level is Day (Monday/Tuesday) or a Section (A/B)
                     if day_str in sections:
-                        # Path: Dept > Batch > Year > Day
                         process_slots(sections[day_str], dept, batch, year_label, assigned_slots, current_time)
                     else:
-                        # Path: Dept > Batch > Year > Section > Day
                         for sec, days in sections.items():
                             if isinstance(days, dict) and day_str in days:
                                 process_slots(days[day_str], dept, batch, sec, assigned_slots, current_time)
     except Exception as e:
-        print(f"Timetable Logic Error: {e}")
+        print(f"Timetable logic failure: {e}")
 
     return render_template('faculty_mark.html', slots=assigned_slots)
 
 def process_slots(day_data, dept, batch, sec, assigned_slots, current_time):
+    if not isinstance(day_data, dict): return
+    
     for period, info in day_data.items():
-        if info.get('faculty') == session.get('user'):
+        # Case insensitive faculty check
+        if str(info.get('faculty')).lower() == str(session.get('user')).lower():
             try:
                 time_range = info.get('time', '').split('-')
                 if len(time_range) == 2:
@@ -149,28 +115,42 @@ def process_slots(day_data, dept, batch, sec, assigned_slots, current_time):
                             'period': period, 'subject': info.get('subject'), 
                             'time': info.get('time')
                         })
-            except: pass
+            except Exception as e:
+                print(f"Time comparison error: {e}")
 
 @app.route('/api/get_students')
 def get_students():
-    dept, batch, sec = request.args.get('dept'), request.args.get('batch'), request.args.get('sec')
+    dept = request.args.get('dept')
+    batch = request.args.get('batch')
+    sec = request.args.get('sec')
+    
+    # Reference path for students
     path = f"Students/{dept}/{batch}/{sec}"
-    data = db.reference(path).get()
-    return jsonify(data) if data else (jsonify({}), 404)
+    try:
+        data = db.reference(path).get()
+        return jsonify(data if data else {})
+    except:
+        return jsonify({"error": "Path error"}), 500
 
 @app.route('/api/submit_attendance', methods=['POST'])
 def submit_attendance():
     d = request.json
     date_str, _, _ = get_ist_info()
-    ref = db.reference(f"Attendance/{d['dept']}/{d['batch']}/{d['sec']}/{date_str}")
+    
+    # Path: Attendance/Dept/Batch/Section/Date
+    ref_path = f"Attendance/{d['dept']}/{d['batch']}/{d['sec']}/{date_str}"
+    ref = db.reference(ref_path)
     subject_name = d.get('subject', 'N/A')
     
-    for roll, info in d['records'].items():
-        ref.child(roll).update({
-            "name": info['name'],
-            d['period']: {"status": info['status'], "subject": subject_name}
-        })
-    return jsonify({"status": "success"})
+    try:
+        for roll, info in d['records'].items():
+            ref.child(roll).update({
+                "name": info['name'],
+                d['period']: {"status": info['status'], "subject": subject_name}
+            })
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # --- ADMIN SECTION ---
 
@@ -182,7 +162,6 @@ def admin_page():
 
 @app.route('/api/admin/get_structure')
 def get_structure():
-    # Crucial for dropdowns: Returns the full Students tree
     data = db.reference('Students').get()
     return jsonify(data if data else {})
 
@@ -192,43 +171,14 @@ def get_report():
     students = db.reference(f"Students/{dept}/{batch}/{sec}").get() or {}
     attendance_data = db.reference(f"Attendance/{dept}/{batch}/{sec}/{date}").get() or {}
     
-    report_data = [{
-        'roll': roll,
-        'name': info.get('name'),
-        'attendance': attendance_data.get(roll, {}) 
-    } for roll, info in students.items()]
+    report_data = []
+    for roll, info in students.items():
+        report_data.append({
+            'roll': roll,
+            'name': info.get('name'),
+            'attendance': attendance_data.get(roll, {}) 
+        })
     return jsonify(report_data)
-
-@app.route('/api/admin/get_student_cumulative_stats')
-def get_student_cumulative_stats():
-    target_roll = request.args.get('roll')
-    if not target_roll: return jsonify({"error": "Roll required"}), 400
-    try:
-        all_data = db.reference('Attendance').get() or {}
-        subject_map = {}
-        # Deep flattened crawl
-        for dept in all_data.values():
-            if not isinstance(dept, dict): continue
-            for batch in dept.values():
-                if not isinstance(batch, dict): continue
-                for sec in batch.values():
-                    if not isinstance(sec, dict): continue
-                    for date_data in sec.values():
-                        if isinstance(date_data, dict) and target_roll in date_data:
-                            student_day = date_data[target_roll]
-                            for i in range(1, 9):
-                                p_key = f'P{i}'
-                                if p_key in student_day:
-                                    p_info = student_day[p_key]
-                                    sub = p_info.get('subject', 'General')
-                                    if sub not in subject_map:
-                                        subject_map[sub] = {"attended": 0, "total": 0}
-                                    subject_map[sub]["total"] += 1
-                                    if p_info.get('status') in ['P', 'Present']:
-                                        subject_map[sub]["attended"] += 1
-        return jsonify(subject_map)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/logout')
 def logout():
