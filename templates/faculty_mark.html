@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mark Attendance | PEC Faculty</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.05); }
+        .status-btn { transition: all 0.2s ease; border: 1px solid #e2e8f0; }
+        .active-P { background-color: #10b981 !important; color: white !important; border-color: #10b981 !important; }
+        .active-A { background-color: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
+        .active-OD { background-color: #f59e0b !important; color: white !important; border-color: #f59e0b !important; }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <nav class="glass-panel rounded-3xl p-5 flex justify-between items-center shadow-sm">
+            <div>
+                <h1 class="text-lg font-bold text-slate-900 leading-tight">{{ session['name'] }}</h1>
+                <p class="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">{{ session['dept'] }} Faculty</p>
+            </div>
+            <a href="/logout" class="bg-rose-50 px-4 py-2 rounded-xl text-xs font-bold text-rose-600 border border-rose-100">Logout</a>
+        </nav>
+
+        <div class="glass-panel rounded-[2rem] p-6 shadow-sm">
+            <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">Available Classes (Click to Mark)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% if slots %}
+                    {% for slot in slots %}
+                    <button onclick="loadClass('{{slot.dept}}', '{{slot.batch}}', '{{slot.sec}}', '{{slot.period}}', '{{slot.subject}}')"
+                            class="p-4 border border-slate-200 bg-white rounded-2xl hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/10 text-left transition-all">
+                        <div class="flex justify-between items-start">
+                            <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md text-[9px] font-black uppercase">{{ slot.period }}</span>
+                            <span class="text-[10px] font-bold text-slate-400">{{ slot.time }}</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mt-2">{{ slot.subject }}</h3>
+                        <p class="text-[10px] font-medium text-slate-500">{{ slot.dept }} • {{ slot.batch }} • Section {{ slot.sec }}</p>
+                    </button>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-span-full py-8 text-center">
+                        <p class="text-slate-400 font-bold text-sm">No active classes found for the current time.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="marking-area" class="hidden space-y-4">
+            <div class="glass-panel rounded-[2rem] p-6 shadow-xl border-t-4 border-indigo-600">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+                    <div>
+                        <h2 id="display-class" class="text-xl font-black text-slate-900 leading-tight"></h2>
+                        <p id="display-period" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="markAll('P')" class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all">Mark All Present</button>
+                        <button onclick="submitAttendance()" class="bg-slate-900 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-600 transition-all">Save to Database</button>
+                    </div>
+                </div>
+
+                <div id="student-list" class="space-y-2 border-t pt-4">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentClass = {};
+        let currentSubject = ""; // Global variable to store subject name
+        let students = [];
+
+        async function loadClass(dept, batch, sec, period, subject) {
+            // Store details for submission
+            currentClass = { dept, batch, sec, period };
+            currentSubject = subject; // Store the subject clicked
+            
+            document.getElementById('display-period').innerText = `${period} | ${subject}`;
+            document.getElementById('display-class').innerText = `${dept} ${batch} - Section ${sec}`;
+            
+            const listContainer = document.getElementById('student-list');
+            listContainer.innerHTML = '<p class="text-center py-4 text-slate-400 animate-pulse">Fetching student list...</p>';
+            document.getElementById('marking-area').classList.remove('hidden');
+            
+            // Scroll to marking area for better mobile experience
+            document.getElementById('marking-area').scrollIntoView({ behavior: 'smooth' });
+
+            try {
+                const url = `/api/get_students?dept=${encodeURIComponent(dept)}&batch=${encodeURIComponent(batch)}&sec=${encodeURIComponent(sec)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (!data || Object.keys(data).length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="p-8 text-center bg-red-50 rounded-2xl border border-red-100">
+                            <p class="text-red-600 font-bold">No students found for Section ${sec}.</p>
+                        </div>`;
+                    return;
+                }
+
+                students = Object.keys(data).map(roll => ({
+                    roll: roll,
+                    name: data[roll].name,
+                    status: 'P' 
+                })).sort((a, b) => a.roll.localeCompare(b.roll));
+                
+                renderList();
+            } catch (e) { 
+                console.error("Fetch Error:", e);
+                alert("Connection error. Is the server running?"); 
+            }
+        }
+
+        function renderList() {
+            const container = document.getElementById('student-list');
+            container.innerHTML = students.map(s => `
+                <div class="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                    <div class="flex-1 min-w-0 pr-4">
+                        <p class="text-[11px] font-black text-slate-800 truncate uppercase">${s.name}</p>
+                        <p class="text-[9px] font-bold text-slate-400 tracking-tighter">${s.roll}</p>
+                    </div>
+                    
+                    <div class="flex bg-slate-50 p-1 rounded-xl">
+                        <button onclick="setStatus('${s.roll}', 'P')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'P' ? 'active-P' : 'text-slate-400'}">PRESENT</button>
+                        <button onclick="setStatus('${s.roll}', 'A')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'A' ? 'active-A' : 'text-slate-400'}">ABSENT</button>
+                        <button onclick="setStatus('${s.roll}', 'OD')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'OD' ? 'active-OD' : 'text-slate-400'}">O.D</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setStatus(roll, status) {
+            const s = students.find(x => x.roll === roll);
+            if(s) s.status = status;
+            renderList();
+        }
+
+        function markAll(status) {
+            students.forEach(s => s.status = status);
+            renderList();
+        }
+
+        async function submitAttendance() {
+            if(!confirm(`Push ${currentSubject} attendance to Firebase?`)) return;
+
+            const records = {};
+            students.forEach(s => {
+                records[s.roll] = { name: s.name, status: s.status };
+            });
+
+            const res = await fetch('/api/submit_attendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // Sending currentClass, the subject name, and the student records
+                body: JSON.stringify({ 
+                    ...currentClass, 
+                    subject: currentSubject, 
+                    records 
+                })
+            });
+
+            if (res.ok) {
+                alert("Attendance Saved Successfully!");
+                location.reload();
+            } else {
+                alert("Error saving data. Check Firebase permissions.");
+            }
+        }
+    </script>
+</body>
+</html>
