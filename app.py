@@ -457,5 +457,9 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.route('/exam')
+def exam():
+    return redirect(url_for('exam.html'))
+    
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
