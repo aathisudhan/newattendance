@@ -459,7 +459,8 @@ def logout():
 
 @app.route('/exam')
 def exam():
-    return redirect(url_for('exam.html'))
+    # Use render_template to show the HTML file
+    return render_template('exam.html')
     
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
