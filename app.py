@@ -69,33 +69,69 @@ def login():
 
 # --- FACULTY SECTION ---
 
+# @app.route('/faculty')
+# def faculty_page():
+#     if session.get('role') != 'faculty':
+#         return redirect(url_for('index'))
+    
+#     _, day_str, current_time = get_ist_info()
+#     timetable = db.reference('Timetable').get() or {}
+#     assigned_slots = []
+    
+#     # Robust Crawl: Handles Dept > Batch > Year > Section OR Dept > Batch > Section
+#     try:
+#         for dept, batches in timetable.items():
+#             if not isinstance(batches, dict): continue
+#             for batch, years in batches.items():
+#                 if not isinstance(years, dict): continue
+#                 for year_label, sections in years.items():
+#                     if not isinstance(sections, dict): continue
+#                     # If the level is already sections
+#                     if day_str in sections:
+#                         process_slots(sections[day_str], dept, batch, year_label, assigned_slots, current_time)
+#                     else:
+#                         # If there is another nested level for Section
+#                         for sec, days in sections.items():
+#                             if isinstance(days, dict) and day_str in days:
+#                                 process_slots(days[day_str], dept, batch, sec, assigned_slots, current_time)
+#     except Exception as e:
+#         print(f"Timetable Error: {e}")
+
+#     return render_template('faculty_mark.html', slots=assigned_slots)
+
 @app.route('/faculty')
 def faculty_page():
     if session.get('role') != 'faculty':
         return redirect(url_for('index'))
     
     _, day_str, current_time = get_ist_info()
-    timetable = db.reference('Timetable').get() or {}
+    # 1. Ensure timetable is always a dict
+    timetable = db.reference('Timetable').get()
+    if not isinstance(timetable, dict):
+        timetable = {}
+
     assigned_slots = []
     
-    # Robust Crawl: Handles Dept > Batch > Year > Section OR Dept > Batch > Section
     try:
         for dept, batches in timetable.items():
             if not isinstance(batches, dict): continue
             for batch, years in batches.items():
                 if not isinstance(years, dict): continue
                 for year_label, sections in years.items():
+                    # FIX: Check if 'sections' is actually the Day (Monday/Tuesday) 
+                    # or if it's a Section level (A/B/C)
                     if not isinstance(sections, dict): continue
-                    # If the level is already sections
+                    
                     if day_str in sections:
+                        # Path: Dept > Batch > Year > Day
                         process_slots(sections[day_str], dept, batch, year_label, assigned_slots, current_time)
                     else:
-                        # If there is another nested level for Section
+                        # Path: Dept > Batch > Year > Section > Day
                         for sec, days in sections.items():
                             if isinstance(days, dict) and day_str in days:
                                 process_slots(days[day_str], dept, batch, sec, assigned_slots, current_time)
     except Exception as e:
-        print(f"Timetable Error: {e}")
+        print(f"Timetable Logic Error: {e}")
 
     return render_template('faculty_mark.html', slots=assigned_slots)
 
