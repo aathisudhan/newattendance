@@ -20,14 +20,14 @@
         
         <nav class="glass-panel rounded-3xl p-5 flex justify-between items-center shadow-sm">
             <div>
-                <h1 class="text-lg font-bold text-slate-900 leading-tight">{{ session['name'] }}</h1>
-                <p class="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">{{ session['dept'] }} Faculty</p>
+                <h1 class="text-lg font-bold text-slate-900 leading-tight">{{ session.get('name', 'Faculty') }}</h1>
+                <p class="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">{{ session.get('dept', 'PEC') }} Faculty</p>
             </div>
             <a href="/logout" class="bg-rose-50 px-4 py-2 rounded-xl text-xs font-bold text-rose-600 border border-rose-100">Logout</a>
         </nav>
 
         <div class="glass-panel rounded-[2rem] p-6 shadow-sm">
-            <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">Available Classes (Click to Mark)</h2>
+            <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">Available Classes (Current IST)</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {% if slots %}
                     {% for slot in slots %}
@@ -38,18 +38,18 @@
                             <span class="text-[10px] font-bold text-slate-400">{{ slot.time }}</span>
                         </div>
                         <h3 class="font-bold text-slate-800 mt-2">{{ slot.subject }}</h3>
-                        <p class="text-[10px] font-medium text-slate-500">{{ slot.dept }} • {{ slot.batch }} • Section {{ slot.sec }}</p>
+                        <p class="text-[10px] font-medium text-slate-500">{{ slot.dept }} • {{ slot.batch }} • {{ slot.sec }}</p>
                     </button>
                     {% endfor %}
                 {% else %}
                     <div class="col-span-full py-8 text-center">
-                        <p class="text-slate-400 font-bold text-sm">No active classes found for the current time.</p>
+                        <p class="text-slate-400 font-bold text-sm">No assigned periods found for you right now.</p>
                     </div>
                 {% endif %}
             </div>
         </div>
 
-        <div id="marking-area" class="hidden space-y-4">
+        <div id="marking-area" class="hidden space-y-4 pb-20">
             <div class="glass-panel rounded-[2rem] p-6 shadow-xl border-t-4 border-indigo-600">
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                     <div>
@@ -57,8 +57,8 @@
                         <p id="display-period" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="markAll('P')" class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all">Mark All Present</button>
-                        <button onclick="submitAttendance()" class="bg-slate-900 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-600 transition-all">Save to Database</button>
+                        <button onclick="markAll('P')" class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all">All Present</button>
+                        <button onclick="submitAttendance()" class="bg-slate-900 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-600 transition-all">Submit to Cloud</button>
                     </div>
                 </div>
 
@@ -70,22 +70,19 @@
 
     <script>
         let currentClass = {};
-        let currentSubject = ""; // Global variable to store subject name
+        let currentSubject = "";
         let students = [];
 
         async function loadClass(dept, batch, sec, period, subject) {
-            // Store details for submission
             currentClass = { dept, batch, sec, period };
-            currentSubject = subject; // Store the subject clicked
+            currentSubject = subject;
             
             document.getElementById('display-period').innerText = `${period} | ${subject}`;
-            document.getElementById('display-class').innerText = `${dept} ${batch} - Section ${sec}`;
+            document.getElementById('display-class').innerText = `${dept} ${batch} - ${sec}`;
             
             const listContainer = document.getElementById('student-list');
-            listContainer.innerHTML = '<p class="text-center py-4 text-slate-400 animate-pulse">Fetching student list...</p>';
+            listContainer.innerHTML = '<div class="py-10 text-center text-slate-400 animate-pulse font-bold">Connecting to Database...</div>';
             document.getElementById('marking-area').classList.remove('hidden');
-            
-            // Scroll to marking area for better mobile experience
             document.getElementById('marking-area').scrollIntoView({ behavior: 'smooth' });
 
             try {
@@ -93,11 +90,8 @@
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                if (!data || Object.keys(data).length === 0) {
-                    listContainer.innerHTML = `
-                        <div class="p-8 text-center bg-red-50 rounded-2xl border border-red-100">
-                            <p class="text-red-600 font-bold">No students found for Section ${sec}.</p>
-                        </div>`;
+                if (!res.ok || !data || Object.keys(data).length === 0) {
+                    listContainer.innerHTML = `<div class="p-8 text-center text-rose-500 font-bold bg-rose-50 rounded-2xl">No students found in ${dept}/${batch}/${sec}.</div>`;
                     return;
                 }
 
@@ -110,31 +104,31 @@
                 renderList();
             } catch (e) { 
                 console.error("Fetch Error:", e);
-                alert("Connection error. Is the server running?"); 
+                alert("Failed to load students. Check server logs."); 
             }
         }
 
         function renderList() {
             const container = document.getElementById('student-list');
             container.innerHTML = students.map(s => `
-                <div class="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex-1 min-w-0 pr-4">
                         <p class="text-[11px] font-black text-slate-800 truncate uppercase">${s.name}</p>
                         <p class="text-[9px] font-bold text-slate-400 tracking-tighter">${s.roll}</p>
                     </div>
                     
                     <div class="flex bg-slate-50 p-1 rounded-xl">
-                        <button onclick="setStatus('${s.roll}', 'P')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'P' ? 'active-P' : 'text-slate-400'}">PRESENT</button>
-                        <button onclick="setStatus('${s.roll}', 'A')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'A' ? 'active-A' : 'text-slate-400'}">ABSENT</button>
-                        <button onclick="setStatus('${s.roll}', 'OD')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'OD' ? 'active-OD' : 'text-slate-400'}">O.D</button>
+                        <button onclick="setStatus('${s.roll}', 'P')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'P' ? 'active-P' : 'text-slate-400'}">P</button>
+                        <button onclick="setStatus('${s.roll}', 'A')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'A' ? 'active-A' : 'text-slate-400'}">A</button>
+                        <button onclick="setStatus('${s.roll}', 'OD')" class="status-btn px-4 py-1.5 rounded-lg text-[10px] font-black ${s.status === 'OD' ? 'active-OD' : 'text-slate-400'}">OD</button>
                     </div>
                 </div>
             `).join('');
         }
 
         function setStatus(roll, status) {
-            const s = students.find(x => x.roll === roll);
-            if(s) s.status = status;
+            const index = students.findIndex(x => x.roll === roll);
+            if(index !== -1) students[index].status = status;
             renderList();
         }
 
@@ -144,29 +138,28 @@
         }
 
         async function submitAttendance() {
-            if(!confirm(`Push ${currentSubject} attendance to Firebase?`)) return;
+            if(!confirm(`Confirm ${currentSubject} attendance for ${currentClass.sec}?`)) return;
 
             const records = {};
             students.forEach(s => {
                 records[s.roll] = { name: s.name, status: s.status };
             });
 
-            const res = await fetch('/api/submit_attendance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Sending currentClass, the subject name, and the student records
-                body: JSON.stringify({ 
-                    ...currentClass, 
-                    subject: currentSubject, 
-                    records 
-                })
-            });
+            try {
+                const res = await fetch('/api/submit_attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...currentClass, subject: currentSubject, records })
+                });
 
-            if (res.ok) {
-                alert("Attendance Saved Successfully!");
-                location.reload();
-            } else {
-                alert("Error saving data. Check Firebase permissions.");
+                if (res.ok) {
+                    alert("✅ Attendance updated in Firebase!");
+                    location.reload();
+                } else {
+                    alert("❌ Server Error: Could not save data.");
+                }
+            } catch (e) {
+                alert("Network error. Check connection.");
             }
         }
     </script>
